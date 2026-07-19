@@ -546,8 +546,8 @@ elements.redo.addEventListener('click', () => restoreHistory(state.redoStack, st
 
 function targetPageIds(allPages) {
   if (allPages) return null;
-  if (state.selected.size) return [...state.selected];
   if (state.viewerIndex >= 0) return [state.pages[state.viewerIndex].id];
+  if (state.selected.size) return [...state.selected];
   return state.pages[0] ? [state.pages[0].id] : [];
 }
 

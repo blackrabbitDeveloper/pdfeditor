@@ -87,6 +87,8 @@ try {
   await page.locator('#number-apply').click();
   assert.equal(await page.locator('#undo').isEnabled(), true, '내용 편집을 실행 취소할 수 있어야 합니다.');
 
+  await page.locator('.page-card').first().locator('.preview-page').click();
+  await page.locator('#page-viewer').waitFor({ state: 'visible' });
   await page.locator('#add-signature').click();
   const pad = page.locator('#signature-pad');
   const box = await pad.boundingBox();

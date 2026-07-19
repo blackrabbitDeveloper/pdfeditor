@@ -106,6 +106,10 @@ button:focus-visible, [tabindex]:focus-visible { outline: 3px solid rgba(255, 91
 .viewer-header strong { font-size: 14px; }
 .viewer-controls { display: flex; align-items: center; gap: 7px; }
 .viewer-controls > span { width: 48px; color: #c8c3ba; font-size: 11px; text-align: center; }
+.viewer-tool { height: 35px; display: flex; align-items: center; gap: 7px; padding: 0 11px; color: white; border: 1px solid rgba(255,255,255,.18); border-radius: 7px; background: rgba(255,255,255,.06); font-size: 11px; cursor: pointer; }
+.viewer-tool:hover { color: var(--accent); background: rgba(255,255,255,.12); }
+.viewer-tool b { font-size: 16px; }
+.viewer-divider { width: 1px; height: 24px; margin: 0 6px; background: rgba(255,255,255,.14); }
 .viewer-button, .viewer-close { width: 35px; height: 35px; display: grid; place-items: center; color: white; border: 1px solid rgba(255,255,255,.18); border-radius: 7px; background: rgba(255,255,255,.06); cursor: pointer; }
 .viewer-button:hover, .viewer-close:hover { background: rgba(255,255,255,.14); }
 .viewer-close { margin-left: 12px; border: 0; font-size: 25px; background: transparent; }
@@ -167,6 +171,8 @@ body.viewer-open { overflow: hidden; }
   .page-viewer { grid-template-rows: 64px minmax(0, 1fr) 42px; }
   .viewer-header { padding: 0 14px; }
   .viewer-header .eyebrow, .viewer-footer > span { display: none; }
+  .viewer-tool { width: 35px; padding: 0; justify-content: center; }
+  .viewer-tool span, .viewer-divider { display: none; }
   .viewer-body { grid-template-columns: 44px minmax(0, 1fr) 44px; }
   .viewer-stage { padding: 18px; }
   .viewer-nav { font-size: 36px; }

@@ -60,8 +60,6 @@
           <button id="add-text" class="tool" type="button"><b>T</b><span>텍스트</span></button>
           <button id="add-watermark" class="tool" type="button"><b>W</b><span>워터마크</span></button>
           <button id="add-page-numbers" class="tool" type="button"><b>#</b><span>페이지 번호</span></button>
-          <button id="add-image" class="tool" type="button"><b>▧</b><span>이미지·도장</span></button>
-          <button id="add-signature" class="tool" type="button"><b>✎</b><span>직접 서명</span></button>
         </div>
         <div class="panel-tip"><b>Tip</b><p>Shift를 누른 채 클릭하면 여러 페이지를 한 번에 선택할 수 있어요.</p></div>
       </aside>
@@ -127,6 +125,9 @@
         <strong id="viewer-title">페이지 미리보기</strong>
       </div>
       <div class="viewer-controls">
+        <button id="add-image" class="viewer-tool" type="button"><b>▧</b><span>이미지·도장</span></button>
+        <button id="add-signature" class="viewer-tool" type="button"><b>✎</b><span>서명</span></button>
+        <i class="viewer-divider" aria-hidden="true"></i>
         <button id="viewer-zoom-out" class="viewer-button" type="button" aria-label="축소">−</button>
         <span id="viewer-zoom-label">100%</span>
         <button id="viewer-zoom-in" class="viewer-button" type="button" aria-label="확대">＋</button>
