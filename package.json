@@ -1,0 +1,17 @@
+{
+  "name": "pdfeditor",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "브라우저에서 안전하게 PDF 페이지를 정리하는 GitHub Pages 웹 도구",
+  "scripts": {
+    "dev": "node serve.mjs",
+    "test": "node --test test/page-operations.test.js",
+    "test:e2e": "node test/browser-flow.mjs"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "pdf-lib": "^1.17.1",
+    "playwright-core": "^1.61.1"
+  }
+}
