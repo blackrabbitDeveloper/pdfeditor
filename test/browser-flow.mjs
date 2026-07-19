@@ -68,6 +68,35 @@ try {
   await page.keyboard.press('Escape');
   await page.locator('#page-viewer').waitFor({ state: 'hidden' });
 
+  await page.locator('#add-watermark').click();
+  await page.locator('#watermark-text').fill('검토용');
+  await page.locator('#watermark-apply').click();
+  await page.locator('#page-viewer').waitFor({ state: 'visible' });
+  await page.keyboard.press('Escape');
+
+  await page.locator('#add-text').click();
+  await page.locator('#text-content').fill('추가 문구');
+  await page.locator('#text-apply').click();
+  await page.locator('#page-viewer').waitFor({ state: 'visible' });
+  await page.keyboard.press('Escape');
+
+  await page.locator('#add-page-numbers').click();
+  await page.locator('#number-format').selectOption('total');
+  await page.locator('#number-apply').click();
+  assert.equal(await page.locator('#undo').isEnabled(), true, '내용 편집을 실행 취소할 수 있어야 합니다.');
+
+  await page.locator('#add-signature').click();
+  const pad = page.locator('#signature-pad');
+  const box = await pad.boundingBox();
+  await page.mouse.move(box.x + 80, box.y + 120);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 180, box.y + 60, { steps: 5 });
+  await page.mouse.move(box.x + 280, box.y + 130, { steps: 5 });
+  await page.mouse.up();
+  await page.locator('#signature-apply').click();
+  await page.locator('#page-viewer').waitFor({ state: 'visible' });
+  await page.keyboard.press('Escape');
+
   await page.locator('.page-card').first().click();
   await page.locator('#rotate-right').click();
   await page.locator('.page-card').first().click();
@@ -89,7 +118,7 @@ try {
   assert.equal(result.getPageCount(), 3, '저장된 PDF도 화면과 같은 페이지 수여야 합니다.');
   assert.equal(result.getPage(1).getRotation().angle, 90, '회전 편집이 저장 파일에 반영되어야 합니다.');
   assert.deepEqual(browserErrors, [], `브라우저 오류가 없어야 합니다: ${browserErrors.join(', ')}`);
-  console.log('✔ 실제 브라우저에서 불러오기, 회전, 복제, 삭제, 재정렬, 저장 검증 완료');
+  console.log('✔ 실제 브라우저에서 페이지 구성, 상세 보기, 워터마크, 텍스트, 번호, 서명, 저장 검증 완료');
 } finally {
   if (browser) await browser.close();
   server.kill();

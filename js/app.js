@@ -26,6 +26,7 @@ const elements = {
   pageViewer: document.getElementById('page-viewer'),
   viewerTitle: document.getElementById('viewer-title'),
   viewerCanvas: document.getElementById('viewer-canvas'),
+  viewerOverlay: document.getElementById('viewer-overlay'),
   viewerStage: document.getElementById('viewer-stage'),
   viewerClose: document.getElementById('viewer-close'),
   viewerPrev: document.getElementById('viewer-prev'),
@@ -37,7 +38,14 @@ const elements = {
   viewerSource: document.getElementById('viewer-source'),
   loading: document.getElementById('loading'),
   loadingText: document.getElementById('loading-text'),
-  toast: document.getElementById('toast')
+  toast: document.getElementById('toast'),
+  undo: document.getElementById('undo'), redo: document.getElementById('redo'),
+  addText: document.getElementById('add-text'), addWatermark: document.getElementById('add-watermark'),
+  addPageNumbers: document.getElementById('add-page-numbers'), addImage: document.getElementById('add-image'),
+  addSignature: document.getElementById('add-signature'), imageInput: document.getElementById('image-input'),
+  textDialog: document.getElementById('text-dialog'), watermarkDialog: document.getElementById('watermark-dialog'),
+  numberDialog: document.getElementById('number-dialog'), signatureDialog: document.getElementById('signature-dialog'),
+  signaturePad: document.getElementById('signature-pad')
 };
 
 const state = {
@@ -52,7 +60,11 @@ const state = {
   viewerIndex: -1,
   viewerZoom: 100,
   viewerRenderToken: 0,
-  viewerRenderTask: null
+  viewerRenderTask: null,
+  annotations: [],
+  pageNumbers: null,
+  undoStack: [],
+  redoStack: []
 };
 
 let toastTimer;
@@ -71,6 +83,35 @@ function setLoading(active, message = 'PDF를 준비하고 있어요') {
 
 function makeId() {
   return state.nextId++;
+}
+
+function snapshot() {
+  return structuredClone({ pages: state.pages, annotations: state.annotations, pageNumbers: state.pageNumbers });
+}
+
+function pushHistory() {
+  state.undoStack.push(snapshot());
+  if (state.undoStack.length > 30) state.undoStack.shift();
+  state.redoStack = [];
+  updateHistoryControls();
+}
+
+function updateHistoryControls() {
+  elements.undo.disabled = state.undoStack.length === 0;
+  elements.redo.disabled = state.redoStack.length === 0;
+}
+
+async function restoreHistory(from, to) {
+  if (!from.length) return;
+  to.push(snapshot());
+  const restored = from.pop();
+  state.pages = restored.pages;
+  state.annotations = restored.annotations;
+  state.pageNumbers = restored.pageNumbers;
+  state.selected.clear();
+  await renderPages();
+  if (!elements.pageViewer.hidden) await renderViewerPage();
+  updateHistoryControls();
 }
 
 function updateControls() {
@@ -131,6 +172,72 @@ async function renderThumbnail(entry, canvas, sheet) {
   await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
 }
 
+function targetsPage(annotation, entry) {
+  return !annotation.pageIds || annotation.pageIds.includes(entry.id);
+}
+
+function positionPoint(position, width, height, margin = 34) {
+  const map = {
+    'top-left': [margin, margin], 'top-center': [width / 2, margin],
+    center: [width / 2, height / 2], 'bottom-left': [margin, height - margin],
+    'bottom-center': [width / 2, height - margin], 'bottom-right': [width - margin, height - margin]
+  };
+  return map[position] || map.center;
+}
+
+function loadImage(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = dataUrl;
+  });
+}
+
+async function drawOverlay(context, width, height, entry, pageIndex, scale = 1) {
+  context.clearRect(0, 0, width, height);
+  for (const annotation of state.annotations) {
+    if (!targetsPage(annotation, entry)) continue;
+    context.save();
+    context.globalAlpha = annotation.opacity ?? 1;
+    if (annotation.type === 'text' || annotation.type === 'watermark') {
+      const [x, y] = positionPoint(annotation.position, width, height, 34 * scale);
+      context.translate(x, y);
+      context.rotate((annotation.rotation || 0) * Math.PI / 180);
+      context.fillStyle = annotation.color;
+      context.font = `600 ${annotation.size * scale}px "Noto Sans KR", sans-serif`;
+      context.textAlign = annotation.position?.includes('left') ? 'left' : annotation.position?.includes('right') ? 'right' : 'center';
+      context.textBaseline = annotation.position?.startsWith('top') ? 'top' : annotation.position?.startsWith('bottom') ? 'bottom' : 'middle';
+      annotation.text.split('\n').forEach((line, lineIndex, lines) => {
+        context.fillText(line, 0, (lineIndex - (lines.length - 1) / 2) * annotation.size * scale * 1.25);
+      });
+    } else if (annotation.type === 'image') {
+      const image = await loadImage(annotation.dataUrl);
+      const targetWidth = width * annotation.width;
+      const targetHeight = targetWidth * image.height / image.width;
+      const point = positionPoint(annotation.position, width, height, 34 * scale);
+      const x = point[0];
+      let y = point[1];
+      if (annotation.position.startsWith('top')) y += targetHeight / 2;
+      if (annotation.position.startsWith('bottom')) y -= targetHeight / 2;
+      context.drawImage(image, x - targetWidth / 2, y - targetHeight / 2, targetWidth, targetHeight);
+    }
+    context.restore();
+  }
+  if (state.pageNumbers) {
+    const number = state.pageNumbers.start + pageIndex;
+    const label = state.pageNumbers.format === 'total' ? `${number} / ${state.pages.length}` : state.pageNumbers.format === 'page' ? `Page ${number}` : `${number}`;
+    const [x, y] = positionPoint(state.pageNumbers.position, width, height, 22 * scale);
+    context.save();
+    context.fillStyle = '#3b3934';
+    context.font = `500 ${state.pageNumbers.size * scale}px "Noto Sans KR", sans-serif`;
+    context.textAlign = state.pageNumbers.position.includes('left') ? 'left' : state.pageNumbers.position.includes('right') ? 'right' : 'center';
+    context.textBaseline = 'bottom';
+    context.fillText(label, x, y);
+    context.restore();
+  }
+}
+
 async function renderPages() {
   elements.pageGrid.textContent = '';
   const fragment = document.createDocumentFragment();
@@ -179,6 +286,12 @@ async function renderViewerPage() {
     if (renderToken === state.viewerRenderToken) state.viewerRenderTask = null;
   }
   if (renderToken !== state.viewerRenderToken) return;
+  const overlay = elements.viewerOverlay;
+  overlay.width = canvas.width;
+  overlay.height = canvas.height;
+  overlay.style.width = canvas.style.width;
+  overlay.style.height = canvas.style.height;
+  await drawOverlay(overlay.getContext('2d'), overlay.width, overlay.height, entry, state.viewerIndex, zoomScale * pixelRatio);
   elements.viewerTitle.textContent = `페이지 ${state.viewerIndex + 1}`;
   elements.viewerPageStatus.textContent = `${state.viewerIndex + 1} / ${state.pages.length}`;
   elements.viewerSource.textContent = source.name;
@@ -245,6 +358,7 @@ function selectPage(id, event) {
 }
 
 async function applyOperation(operation, message) {
+  pushHistory();
   state.pages = operation(state.pages, [...state.selected]);
   state.selected.clear();
   state.lastSelected = null;
@@ -261,12 +375,30 @@ async function savePdf() {
     for (const source of state.sources.values()) {
       loaded.set(source.id, await PDFDocument.load(source.bytes.slice(), { ignoreEncryption: false }));
     }
-    for (const entry of state.pages) {
+    for (const [outputIndex, entry] of state.pages.entries()) {
       const sourceDocument = loaded.get(entry.sourceId);
       const [page] = await output.copyPages(sourceDocument, [entry.sourcePageIndex]);
       const originalRotation = page.getRotation().angle || 0;
-      page.setRotation(degrees(((originalRotation + entry.rotation) % 360 + 360) % 360));
+      const rotation = ((originalRotation + entry.rotation) % 360 + 360) % 360;
+      page.setRotation(degrees(rotation));
       output.addPage(page);
+      if (state.annotations.some(annotation => targetsPage(annotation, entry)) || state.pageNumbers) {
+        const rawWidth = page.getWidth();
+        const rawHeight = page.getHeight();
+        const visibleWidth = rotation % 180 ? rawHeight : rawWidth;
+        const visibleHeight = rotation % 180 ? rawWidth : rawHeight;
+        const overlayCanvas = document.createElement('canvas');
+        overlayCanvas.width = Math.ceil(visibleWidth * 2);
+        overlayCanvas.height = Math.ceil(visibleHeight * 2);
+        await drawOverlay(overlayCanvas.getContext('2d'), overlayCanvas.width, overlayCanvas.height, entry, outputIndex, 2);
+        const blob = await new Promise(resolve => overlayCanvas.toBlob(resolve, 'image/png'));
+        const overlayImage = await output.embedPng(await blob.arrayBuffer());
+        const placement = rotation === 90 ? { x: 0, y: rawHeight, width: rawHeight, height: rawWidth, rotate: degrees(-90) }
+          : rotation === 180 ? { x: rawWidth, y: rawHeight, width: rawWidth, height: rawHeight, rotate: degrees(180) }
+          : rotation === 270 ? { x: rawWidth, y: 0, width: rawHeight, height: rawWidth, rotate: degrees(90) }
+          : { x: 0, y: 0, width: rawWidth, height: rawHeight };
+        page.drawImage(overlayImage, placement);
+      }
     }
     const bytes = await output.save();
     const blob = new Blob([bytes], { type: 'application/pdf' });
@@ -352,6 +484,7 @@ elements.pageGrid.addEventListener('drop', async event => {
   const card = event.target.closest('.page-card');
   if (!card) return;
   event.preventDefault();
+  pushHistory();
   state.pages = movePages(state.pages, state.draggingIds, Number(card.dataset.id));
   await renderPages();
 });
@@ -376,6 +509,90 @@ elements.selectAll.addEventListener('click', () => {
 });
 elements.zoom.addEventListener('input', event => elements.pageGrid.style.setProperty('--thumb-width', `${event.target.value}px`));
 elements.saveButton.addEventListener('click', savePdf);
+elements.undo.addEventListener('click', () => restoreHistory(state.undoStack, state.redoStack));
+elements.redo.addEventListener('click', () => restoreHistory(state.redoStack, state.undoStack));
+
+function targetPageIds(allPages) {
+  if (allPages) return null;
+  if (state.selected.size) return [...state.selected];
+  if (state.viewerIndex >= 0) return [state.pages[state.viewerIndex].id];
+  return state.pages[0] ? [state.pages[0].id] : [];
+}
+
+async function addAnnotation(annotation, message) {
+  pushHistory();
+  state.annotations.push({ id: makeId(), ...annotation });
+  if (elements.pageViewer.hidden) {
+    const targetId = annotation.pageIds?.[0];
+    const index = targetId ? state.pages.findIndex(page => page.id === targetId) : 0;
+    await openViewer(Math.max(0, index));
+  } else {
+    await renderViewerPage();
+  }
+  showToast(message);
+}
+
+elements.addText.addEventListener('click', () => elements.textDialog.showModal());
+elements.addWatermark.addEventListener('click', () => elements.watermarkDialog.showModal());
+elements.addPageNumbers.addEventListener('click', () => elements.numberDialog.showModal());
+elements.addImage.addEventListener('click', () => elements.imageInput.click());
+elements.addSignature.addEventListener('click', () => elements.signatureDialog.showModal());
+document.getElementById('watermark-opacity').addEventListener('input', event => {
+  document.getElementById('watermark-opacity-label').textContent = `${event.target.value}%`;
+});
+document.getElementById('text-apply').addEventListener('click', event => {
+  const text = document.getElementById('text-content').value.trim();
+  if (!text) { event.preventDefault(); showToast('추가할 텍스트를 입력해 주세요.'); return; }
+  addAnnotation({ type: 'text', text, size: Number(document.getElementById('text-size').value), color: document.getElementById('text-color').value, opacity: 1, rotation: 0, position: document.getElementById('text-position').value, pageIds: targetPageIds(document.getElementById('text-all-pages').checked) }, '텍스트를 추가했습니다.');
+});
+document.getElementById('watermark-apply').addEventListener('click', event => {
+  const text = document.getElementById('watermark-text').value.trim();
+  if (!text) { event.preventDefault(); showToast('워터마크 텍스트를 입력해 주세요.'); return; }
+  addAnnotation({ type: 'watermark', text, size: Number(document.getElementById('watermark-size').value), color: document.getElementById('watermark-color').value, opacity: Number(document.getElementById('watermark-opacity').value) / 100, rotation: Number(document.getElementById('watermark-rotation').value), position: 'center', pageIds: targetPageIds(document.getElementById('watermark-all-pages').checked) }, '워터마크를 추가했습니다.');
+});
+document.getElementById('number-apply').addEventListener('click', () => {
+  pushHistory();
+  state.pageNumbers = { start: Number(document.getElementById('number-start').value), size: Number(document.getElementById('number-size').value), format: document.getElementById('number-format').value, position: document.getElementById('number-position').value };
+  if (!elements.pageViewer.hidden) renderViewerPage();
+  showToast('페이지 번호를 적용했습니다.');
+});
+document.getElementById('number-remove').addEventListener('click', () => {
+  if (!state.pageNumbers) return;
+  pushHistory(); state.pageNumbers = null;
+  if (!elements.pageViewer.hidden) renderViewerPage();
+  showToast('페이지 번호를 제거했습니다.');
+});
+elements.imageInput.addEventListener('change', event => {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => addAnnotation({ type: 'image', dataUrl: reader.result, width: .32, opacity: 1, position: 'center', pageIds: targetPageIds(false) }, '이미지·도장을 추가했습니다.');
+  reader.readAsDataURL(file);
+  event.target.value = '';
+});
+
+const signatureContext = elements.signaturePad.getContext('2d');
+signatureContext.lineWidth = 4;
+signatureContext.lineCap = 'round';
+signatureContext.strokeStyle = '#171717';
+let signing = false;
+function signaturePoint(event) {
+  const rect = elements.signaturePad.getBoundingClientRect();
+  return [(event.clientX - rect.left) * elements.signaturePad.width / rect.width, (event.clientY - rect.top) * elements.signaturePad.height / rect.height];
+}
+elements.signaturePad.addEventListener('pointerdown', event => {
+  signing = true; elements.signaturePad.setPointerCapture(event.pointerId);
+  const [x, y] = signaturePoint(event); signatureContext.beginPath(); signatureContext.moveTo(x, y);
+});
+elements.signaturePad.addEventListener('pointermove', event => {
+  if (!signing) return; const [x, y] = signaturePoint(event); signatureContext.lineTo(x, y); signatureContext.stroke();
+});
+elements.signaturePad.addEventListener('pointerup', () => { signing = false; });
+document.getElementById('signature-clear').addEventListener('click', event => { event.preventDefault(); signatureContext.clearRect(0, 0, elements.signaturePad.width, elements.signaturePad.height); });
+document.getElementById('signature-apply').addEventListener('click', () => {
+  addAnnotation({ type: 'image', dataUrl: elements.signaturePad.toDataURL('image/png'), width: .32, opacity: 1, position: 'bottom-center', pageIds: targetPageIds(false) }, '서명을 추가했습니다.');
+  signatureContext.clearRect(0, 0, elements.signaturePad.width, elements.signaturePad.height);
+});
 elements.viewerClose.addEventListener('click', closeViewer);
 elements.viewerPrev.addEventListener('click', () => changeViewerPage(-1));
 elements.viewerNext.addEventListener('click', () => changeViewerPage(1));
@@ -385,6 +602,15 @@ elements.pageViewer.addEventListener('click', event => {
   if (event.target === elements.pageViewer) closeViewer();
 });
 document.addEventListener('keydown', event => {
+  const historyModifier = event.ctrlKey || event.metaKey;
+  if (historyModifier && event.key.toLowerCase() === 'z') {
+    event.preventDefault();
+    event.shiftKey ? restoreHistory(state.redoStack, state.undoStack) : restoreHistory(state.undoStack, state.redoStack);
+    return;
+  }
+  if (historyModifier && event.key.toLowerCase() === 'y') {
+    event.preventDefault(); restoreHistory(state.redoStack, state.undoStack); return;
+  }
   if (!elements.pageViewer.hidden) {
     if (event.key === 'Escape') closeViewer();
     if (event.key === 'ArrowLeft') changeViewerPage(-1);

@@ -112,6 +112,8 @@ button:focus-visible, [tabindex]:focus-visible { outline: 3px solid rgba(255, 91
 .viewer-body { min-height: 0; display: grid; grid-template-columns: 70px minmax(0, 1fr) 70px; align-items: stretch; }
 .viewer-stage { min-width: 0; min-height: 0; display: grid; place-items: center; overflow: auto; padding: 34px; background: #373530; }
 .viewer-stage canvas { display: block; max-width: none; background: white; box-shadow: 0 18px 50px rgba(0,0,0,.35); }
+.viewer-page { position: relative; }
+.viewer-page #viewer-overlay { position: absolute; inset: 0; z-index: 2; background: transparent; box-shadow: none; pointer-events: none; }
 .viewer-nav { color: white; border: 0; background: #292824; font-family: Georgia, serif; font-size: 48px; cursor: pointer; transition: .15s ease; }
 .viewer-nav:hover:not(:disabled) { color: var(--accent); background: #24231f; }
 .viewer-nav:disabled { color: #5d5952; cursor: not-allowed; }
@@ -119,6 +121,23 @@ button:focus-visible, [tabindex]:focus-visible { outline: 3px solid rgba(255, 91
 .viewer-footer strong { color: white; font-size: 12px; }
 .viewer-footer span:last-child { text-align: right; }
 body.viewer-open { overflow: hidden; }
+.edit-dialog { width: min(460px, calc(100% - 28px)); padding: 0; color: var(--ink); border: 0; border-radius: 14px; background: var(--white); box-shadow: 0 28px 80px rgba(0,0,0,.3); }
+.edit-dialog::backdrop { background: rgba(30,28,25,.68); backdrop-filter: blur(4px); }
+.edit-dialog form { display: grid; gap: 18px; padding: 25px; }
+.edit-dialog header, .edit-dialog footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.edit-dialog header { padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.edit-dialog header h2 { margin: 5px 0 0; font-size: 21px; }
+.edit-dialog header > button { border: 0; background: none; font-size: 25px; cursor: pointer; }
+.edit-dialog label { display: grid; gap: 7px; color: var(--muted); font-size: 11px; font-weight: 700; }
+.edit-dialog input:not([type="checkbox"]):not([type="color"]), .edit-dialog textarea, .edit-dialog select { width: 100%; padding: 11px; color: var(--ink); border: 1px solid var(--line); border-radius: 7px; background: white; resize: vertical; }
+.edit-dialog input[type="color"] { width: 100%; height: 41px; padding: 3px; border: 1px solid var(--line); border-radius: 7px; background: white; }
+.edit-dialog input[type="range"] { width: 100%; accent-color: var(--accent); }
+.edit-dialog .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
+.edit-dialog .check-label { display: flex; align-items: center; gap: 8px; color: var(--ink); }
+.edit-dialog footer { justify-content: flex-end; padding-top: 5px; }
+.signature-dialog { width: min(630px, calc(100% - 28px)); }
+.signature-dialog canvas { width: 100%; height: auto; border: 1px dashed #aaa297; border-radius: 8px; background: white; touch-action: none; cursor: crosshair; }
+.signature-dialog p { margin: -10px 0 0; color: var(--muted); font-size: 11px; }
 .loading { position: fixed; inset: 0; z-index: 50; display: grid; place-content: center; justify-items: center; gap: 18px; background: rgba(246,243,237,.86); backdrop-filter: blur(8px); }
 .loading span { width: 38px; height: 38px; border: 3px solid #d9d2c7; border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
 .loading strong { font-size: 13px; }
