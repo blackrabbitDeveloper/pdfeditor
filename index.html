@@ -144,6 +144,14 @@
       <strong id="viewer-page-status">1 / 1</strong>
       <span>서명·도장은 페이지 안에서 드래그 이동</span>
     </div>
+    <div id="viewer-transform" class="viewer-transform" hidden>
+      <strong>TRANSFORM</strong>
+      <label>X <input id="transform-x" type="number" min="0" max="100" step="1"><span>%</span></label>
+      <label>Y <input id="transform-y" type="number" min="0" max="100" step="1"><span>%</span></label>
+      <label>크기 <input id="transform-size" type="number" min="5" max="90" step="1"><span>%</span></label>
+      <label>회전 <input id="transform-rotation" type="number" min="-180" max="180" step="1"><span>°</span></label>
+      <button id="transform-delete" type="button">삭제</button>
+    </div>
   </div>
   <div id="loading" class="loading" hidden><span></span><strong id="loading-text">PDF를 준비하고 있어요</strong></div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
