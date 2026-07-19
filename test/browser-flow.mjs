@@ -70,6 +70,8 @@ try {
 
   await page.locator('#add-watermark').click();
   await page.locator('#watermark-text').fill('검토용');
+  await page.locator('#watermark-rotation').fill('35');
+  assert.equal(await page.locator('#watermark-rotation-label').textContent(), '35°', '워터마크 각도를 세부 조절할 수 있어야 합니다.');
   await page.locator('#watermark-apply').click();
   await page.locator('#page-viewer').waitFor({ state: 'visible' });
   await page.keyboard.press('Escape');
@@ -95,6 +97,17 @@ try {
   await page.mouse.up();
   await page.locator('#signature-apply').click();
   await page.locator('#page-viewer').waitFor({ state: 'visible' });
+  const overlay = page.locator('#viewer-overlay');
+  await page.waitForFunction(() => document.querySelector('#viewer-overlay').classList.contains('has-movable'));
+  const overlayBox = await overlay.boundingBox();
+  const hitbox = await overlay.evaluate(canvas => JSON.parse(canvas.dataset.hitboxes).at(-1));
+  const startX = overlayBox.x + (hitbox.x + hitbox.width / 2) / await overlay.evaluate(canvas => canvas.width) * overlayBox.width;
+  const startY = overlayBox.y + (hitbox.y + hitbox.height / 2) / await overlay.evaluate(canvas => canvas.height) * overlayBox.height;
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(overlayBox.x + overlayBox.width * .28, overlayBox.y + overlayBox.height * .32, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForFunction(() => document.querySelector('#toast').textContent.includes('위치를 변경'));
   await page.keyboard.press('Escape');
 
   await page.locator('.page-card').first().click();

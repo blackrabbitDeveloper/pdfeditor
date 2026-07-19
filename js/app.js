@@ -64,7 +64,10 @@ const state = {
   annotations: [],
   pageNumbers: null,
   undoStack: [],
-  redoStack: []
+  redoStack: [],
+  overlayHitboxes: [],
+  selectedAnnotationId: null,
+  draggingAnnotationId: null
 };
 
 let toastTimer;
@@ -194,8 +197,9 @@ function loadImage(dataUrl) {
   });
 }
 
-async function drawOverlay(context, width, height, entry, pageIndex, scale = 1) {
+async function drawOverlay(context, width, height, entry, pageIndex, scale = 1, interactive = false) {
   context.clearRect(0, 0, width, height);
+  const hitboxes = [];
   for (const annotation of state.annotations) {
     if (!targetsPage(annotation, entry)) continue;
     context.save();
@@ -216,11 +220,22 @@ async function drawOverlay(context, width, height, entry, pageIndex, scale = 1) 
       const targetWidth = width * annotation.width;
       const targetHeight = targetWidth * image.height / image.width;
       const point = positionPoint(annotation.position, width, height, 34 * scale);
-      const x = point[0];
-      let y = point[1];
-      if (annotation.position.startsWith('top')) y += targetHeight / 2;
-      if (annotation.position.startsWith('bottom')) y -= targetHeight / 2;
+      const x = annotation.x == null ? point[0] : annotation.x * width;
+      let y = annotation.y == null ? point[1] : annotation.y * height;
+      if (annotation.y == null && annotation.position.startsWith('top')) y += targetHeight / 2;
+      if (annotation.y == null && annotation.position.startsWith('bottom')) y -= targetHeight / 2;
       context.drawImage(image, x - targetWidth / 2, y - targetHeight / 2, targetWidth, targetHeight);
+      const box = { id: annotation.id, x: x - targetWidth / 2, y: y - targetHeight / 2, width: targetWidth, height: targetHeight };
+      hitboxes.push(box);
+      if (interactive && annotation.id === state.selectedAnnotationId) {
+        context.save();
+        context.globalAlpha = 1;
+        context.strokeStyle = '#ff5b3d';
+        context.lineWidth = Math.max(2, 2 * scale);
+        context.setLineDash([7 * scale, 5 * scale]);
+        context.strokeRect(box.x, box.y, box.width, box.height);
+        context.restore();
+      }
     }
     context.restore();
   }
@@ -236,6 +251,7 @@ async function drawOverlay(context, width, height, entry, pageIndex, scale = 1) 
     context.fillText(label, x, y);
     context.restore();
   }
+  return hitboxes;
 }
 
 async function renderPages() {
@@ -291,7 +307,9 @@ async function renderViewerPage() {
   overlay.height = canvas.height;
   overlay.style.width = canvas.style.width;
   overlay.style.height = canvas.style.height;
-  await drawOverlay(overlay.getContext('2d'), overlay.width, overlay.height, entry, state.viewerIndex, zoomScale * pixelRatio);
+  state.overlayHitboxes = await drawOverlay(overlay.getContext('2d'), overlay.width, overlay.height, entry, state.viewerIndex, zoomScale * pixelRatio, true);
+  overlay.dataset.hitboxes = JSON.stringify(state.overlayHitboxes);
+  overlay.classList.toggle('has-movable', state.overlayHitboxes.length > 0);
   elements.viewerTitle.textContent = `페이지 ${state.viewerIndex + 1}`;
   elements.viewerPageStatus.textContent = `${state.viewerIndex + 1} / ${state.pages.length}`;
   elements.viewerSource.textContent = source.name;
@@ -314,8 +332,22 @@ function closeViewer() {
   if (state.viewerRenderTask) state.viewerRenderTask.cancel();
   state.viewerRenderTask = null;
   state.viewerIndex = -1;
+  state.selectedAnnotationId = null;
+  state.draggingAnnotationId = null;
+  state.overlayHitboxes = [];
   elements.pageViewer.hidden = true;
   document.body.classList.remove('viewer-open');
+}
+
+async function redrawViewerOverlay() {
+  if (state.viewerIndex < 0) return;
+  const entry = state.pages[state.viewerIndex];
+  const overlay = elements.viewerOverlay;
+  const canvas = elements.viewerCanvas;
+  const scale = canvas.width / Math.max(1, parseFloat(canvas.style.width));
+  const viewportScale = 1.35 * state.viewerZoom / 100 * scale;
+  state.overlayHitboxes = await drawOverlay(overlay.getContext('2d'), overlay.width, overlay.height, entry, state.viewerIndex, viewportScale, true);
+  overlay.dataset.hitboxes = JSON.stringify(state.overlayHitboxes);
 }
 
 async function changeViewerPage(amount) {
@@ -540,6 +572,9 @@ elements.addSignature.addEventListener('click', () => elements.signatureDialog.s
 document.getElementById('watermark-opacity').addEventListener('input', event => {
   document.getElementById('watermark-opacity-label').textContent = `${event.target.value}%`;
 });
+document.getElementById('watermark-rotation').addEventListener('input', event => {
+  document.getElementById('watermark-rotation-label').textContent = `${event.target.value}°`;
+});
 document.getElementById('text-apply').addEventListener('click', event => {
   const text = document.getElementById('text-content').value.trim();
   if (!text) { event.preventDefault(); showToast('추가할 텍스트를 입력해 주세요.'); return; }
@@ -566,7 +601,7 @@ elements.imageInput.addEventListener('change', event => {
   const file = event.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = () => addAnnotation({ type: 'image', dataUrl: reader.result, width: .32, opacity: 1, position: 'center', pageIds: targetPageIds(false) }, '이미지·도장을 추가했습니다.');
+  reader.onload = () => addAnnotation({ type: 'image', dataUrl: reader.result, width: .32, opacity: 1, position: 'center', x: .5, y: .5, pageIds: targetPageIds(false) }, '이미지·도장을 추가했습니다. 페이지 안에서 드래그해 위치를 조정하세요.');
   reader.readAsDataURL(file);
   event.target.value = '';
 });
@@ -590,8 +625,46 @@ elements.signaturePad.addEventListener('pointermove', event => {
 elements.signaturePad.addEventListener('pointerup', () => { signing = false; });
 document.getElementById('signature-clear').addEventListener('click', event => { event.preventDefault(); signatureContext.clearRect(0, 0, elements.signaturePad.width, elements.signaturePad.height); });
 document.getElementById('signature-apply').addEventListener('click', () => {
-  addAnnotation({ type: 'image', dataUrl: elements.signaturePad.toDataURL('image/png'), width: .32, opacity: 1, position: 'bottom-center', pageIds: targetPageIds(false) }, '서명을 추가했습니다.');
+  addAnnotation({ type: 'image', dataUrl: elements.signaturePad.toDataURL('image/png'), width: .32, opacity: 1, position: 'bottom-center', x: .5, y: .65, pageIds: targetPageIds(false) }, '서명을 추가했습니다. 페이지 안에서 드래그해 위치를 조정하세요.');
   signatureContext.clearRect(0, 0, elements.signaturePad.width, elements.signaturePad.height);
+});
+
+function overlayPoint(event) {
+  const rect = elements.viewerOverlay.getBoundingClientRect();
+  return {
+    x: (event.clientX - rect.left) * elements.viewerOverlay.width / rect.width,
+    y: (event.clientY - rect.top) * elements.viewerOverlay.height / rect.height
+  };
+}
+elements.viewerOverlay.addEventListener('pointerdown', event => {
+  const point = overlayPoint(event);
+  const hit = [...state.overlayHitboxes].reverse().find(box => point.x >= box.x && point.x <= box.x + box.width && point.y >= box.y && point.y <= box.y + box.height);
+  state.selectedAnnotationId = hit?.id ?? null;
+  if (!hit) { redrawViewerOverlay(); return; }
+  pushHistory();
+  state.draggingAnnotationId = hit.id;
+  elements.viewerOverlay.classList.add('dragging');
+  elements.viewerOverlay.setPointerCapture(event.pointerId);
+  redrawViewerOverlay();
+});
+elements.viewerOverlay.addEventListener('pointermove', event => {
+  if (!state.draggingAnnotationId) return;
+  const point = overlayPoint(event);
+  const annotation = state.annotations.find(item => item.id === state.draggingAnnotationId);
+  const box = state.overlayHitboxes.find(item => item.id === state.draggingAnnotationId);
+  if (!annotation || !box) return;
+  const halfWidth = box.width / elements.viewerOverlay.width / 2;
+  const halfHeight = box.height / elements.viewerOverlay.height / 2;
+  annotation.x = Math.max(halfWidth, Math.min(1 - halfWidth, point.x / elements.viewerOverlay.width));
+  annotation.y = Math.max(halfHeight, Math.min(1 - halfHeight, point.y / elements.viewerOverlay.height));
+  redrawViewerOverlay();
+});
+elements.viewerOverlay.addEventListener('pointerup', event => {
+  if (!state.draggingAnnotationId) return;
+  state.draggingAnnotationId = null;
+  elements.viewerOverlay.classList.remove('dragging');
+  if (elements.viewerOverlay.hasPointerCapture(event.pointerId)) elements.viewerOverlay.releasePointerCapture(event.pointerId);
+  showToast('위치를 변경했습니다.');
 });
 elements.viewerClose.addEventListener('click', closeViewer);
 elements.viewerPrev.addEventListener('click', () => changeViewerPage(-1));

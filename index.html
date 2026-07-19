@@ -101,7 +101,7 @@
       <label>텍스트<input id="watermark-text" type="text" value="CONFIDENTIAL"></label>
       <div class="field-row"><label>크기<input id="watermark-size" type="number" min="16" max="160" value="64"></label><label>색상<input id="watermark-color" type="color" value="#d9472f"></label></div>
       <label>투명도 <output id="watermark-opacity-label">20%</output><input id="watermark-opacity" type="range" min="5" max="80" value="20"></label>
-      <label>회전<select id="watermark-rotation"><option value="-45">-45°</option><option value="0">0°</option><option value="45">45°</option></select></label>
+      <label>회전 각도 <output id="watermark-rotation-label">-45°</output><input id="watermark-rotation" type="range" min="-180" max="180" step="5" value="-45"></label>
       <label class="check-label"><input id="watermark-all-pages" type="checkbox" checked> 모든 페이지에 적용</label>
       <footer><button value="cancel" class="button secondary">취소</button><button id="watermark-apply" value="default" class="button primary">적용</button></footer>
     </form>
@@ -141,7 +141,7 @@
     <div class="viewer-footer">
       <span id="viewer-source"></span>
       <strong id="viewer-page-status">1 / 1</strong>
-      <span>← → 키로 페이지 이동</span>
+      <span>서명·도장은 페이지 안에서 드래그 이동</span>
     </div>
   </div>
   <div id="loading" class="loading" hidden><span></span><strong id="loading-text">PDF를 준비하고 있어요</strong></div>
