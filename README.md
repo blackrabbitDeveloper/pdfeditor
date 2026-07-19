@@ -1,23 +1,32 @@
+<div align="center">
+
 # PDF Editor
 
-브라우저에서 PDF 페이지를 재정렬하고, 회전하고, 합쳐서 새 파일로 저장하는 정적 웹 도구입니다. 파일은 서버로 업로드되지 않고 현재 브라우저 안에서만 처리됩니다.
+PDF 페이지를 정리하고 편집한 결과를 새 파일로 저장합니다.
+
+[![Open App](https://img.shields.io/badge/Open_App-E8795A?style=for-the-badge&logo=googlechrome&logoColor=white)](https://blackrabbitdeveloper.github.io/pdfeditor/)
+[![Tests](https://img.shields.io/badge/Tests-5_passing-248A5A?style=for-the-badge)](#테스트)
+
+</div>
+
+> PDF는 기기 밖으로 나가지 않으며 현재 브라우저 안에서만 처리됩니다.
 
 ## 주요 기능
 
-- PDF 여러 개 열기 및 병합
-- 페이지 썸네일 다중 선택
-- 페이지 상세 보기, 이전/다음 탐색, 확대/축소
-- 텍스트·워터마크 추가 및 페이지 번호
-- 워터마크 각도 -180°~180° 세부 조절
-- PNG/JPEG/WebP 이미지·도장 삽입 및 페이지 내부 드래그 배치
-- 마우스·터치 직접 서명 및 페이지 내부 드래그 배치
-- 상세보기에서 페이지를 클릭한 위치에 이미지·도장·서명 추가
-- Transform 패널에서 X·Y·크기(% 또는 mm)·회전값 직접 조정 및 요소 삭제
-- 실행 취소·다시 실행
-- 드래그 재정렬
-- 페이지 회전, 복제, 삭제
+- 여러 PDF 열기 및 병합
+- 페이지 선택, 이동, 회전, 복제, 삭제
+- 텍스트, 워터마크, 페이지 번호 추가
+- 이미지와 서명 배치
+- 실행 취소 및 다시 실행
 - 편집 결과를 새 PDF로 저장
-- 모바일 반응형 UI
+- Dark/Light 공통 테마와 모바일 UI
+
+## 사용법
+
+1. [PDF Editor](https://blackrabbitdeveloper.github.io/pdfeditor/)를 엽니다.
+2. PDF를 끌어 놓거나 파일 선택 버튼으로 추가합니다.
+3. 페이지 순서와 필요한 요소를 편집합니다.
+4. **PDF 저장**으로 결과를 내려받습니다.
 
 ## 로컬 실행
 
@@ -35,17 +44,16 @@ npm test
 npm run test:e2e
 ```
 
-`test:e2e`는 로컬 Chrome을 이용해 PDF 불러오기부터 저장 결과 검증까지 수행합니다. Chrome 경로가 다르면 `CHROME_PATH` 환경 변수를 지정할 수 있습니다.
+## 기술
 
-## 배포
+- Vanilla HTML, CSS, JavaScript
+- PDF.js, pdf-lib
+- GitHub Pages
 
-GitHub 저장소의 **Settings → Pages**에서 **Deploy from a branch**, `main`, `/(root)`를 선택합니다.
+## 개인정보
 
-배포 주소: <https://blackrabbitdeveloper.github.io/pdfeditor/>
+불러온 PDF와 편집 결과는 별도 서버에 업로드되지 않습니다.
 
-## 사용 라이브러리
+## 라이선스
 
-- [PDF.js](https://github.com/mozilla/pdf.js) — 미리보기 렌더링
-- [pdf-lib](https://github.com/Hopding/pdf-lib) — PDF 문서 생성 및 편집
-
-상세 제품 범위는 [제품 기획 문서](docs/product-plan.md)를 참고하세요.
+저장소의 라이선스 정책을 따릅니다.
