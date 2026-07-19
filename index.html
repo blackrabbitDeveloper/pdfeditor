@@ -76,6 +76,30 @@
   </main>
 
   <input id="file-input" type="file" accept="application/pdf,.pdf" multiple hidden>
+  <div id="page-viewer" class="page-viewer" role="dialog" aria-modal="true" aria-labelledby="viewer-title" hidden>
+    <div class="viewer-header">
+      <div>
+        <span class="eyebrow">PAGE PREVIEW</span>
+        <strong id="viewer-title">페이지 미리보기</strong>
+      </div>
+      <div class="viewer-controls">
+        <button id="viewer-zoom-out" class="viewer-button" type="button" aria-label="축소">−</button>
+        <span id="viewer-zoom-label">100%</span>
+        <button id="viewer-zoom-in" class="viewer-button" type="button" aria-label="확대">＋</button>
+        <button id="viewer-close" class="viewer-close" type="button" aria-label="미리보기 닫기">×</button>
+      </div>
+    </div>
+    <div class="viewer-body">
+      <button id="viewer-prev" class="viewer-nav prev" type="button" aria-label="이전 페이지">‹</button>
+      <div id="viewer-stage" class="viewer-stage"><canvas id="viewer-canvas"></canvas></div>
+      <button id="viewer-next" class="viewer-nav next" type="button" aria-label="다음 페이지">›</button>
+    </div>
+    <div class="viewer-footer">
+      <span id="viewer-source"></span>
+      <strong id="viewer-page-status">1 / 1</strong>
+      <span>← → 키로 페이지 이동</span>
+    </div>
+  </div>
   <div id="loading" class="loading" hidden><span></span><strong id="loading-text">PDF를 준비하고 있어요</strong></div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
@@ -83,4 +107,3 @@
   <script type="module" src="js/app.js"></script>
 </body>
 </html>
-

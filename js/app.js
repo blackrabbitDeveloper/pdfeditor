@@ -23,6 +23,18 @@ const elements = {
   delete: document.getElementById('delete'),
   selectAll: document.getElementById('select-all'),
   zoom: document.getElementById('zoom'),
+  pageViewer: document.getElementById('page-viewer'),
+  viewerTitle: document.getElementById('viewer-title'),
+  viewerCanvas: document.getElementById('viewer-canvas'),
+  viewerStage: document.getElementById('viewer-stage'),
+  viewerClose: document.getElementById('viewer-close'),
+  viewerPrev: document.getElementById('viewer-prev'),
+  viewerNext: document.getElementById('viewer-next'),
+  viewerZoomOut: document.getElementById('viewer-zoom-out'),
+  viewerZoomIn: document.getElementById('viewer-zoom-in'),
+  viewerZoomLabel: document.getElementById('viewer-zoom-label'),
+  viewerPageStatus: document.getElementById('viewer-page-status'),
+  viewerSource: document.getElementById('viewer-source'),
   loading: document.getElementById('loading'),
   loadingText: document.getElementById('loading-text'),
   toast: document.getElementById('toast')
@@ -36,7 +48,11 @@ const state = {
   nextId: 1,
   nextSourceId: 1,
   filename: 'document.pdf',
-  draggingIds: []
+  draggingIds: [],
+  viewerIndex: -1,
+  viewerZoom: 100,
+  viewerRenderToken: 0,
+  viewerRenderTask: null
 };
 
 let toastTimer;
@@ -125,7 +141,7 @@ async function renderPages() {
     card.className = `page-card${state.selected.has(entry.id) ? ' selected' : ''}`;
     card.draggable = true;
     card.dataset.id = entry.id;
-    card.innerHTML = '<span class="selection-check">✓</span><div class="page-sheet"><canvas></canvas></div><span class="page-number"></span>';
+    card.innerHTML = '<span class="selection-check">✓</span><button class="preview-page" type="button" aria-label="이 페이지 크게 보기">크게 보기</button><div class="page-sheet"><canvas></canvas></div><span class="page-number"></span>';
     card.querySelector('.page-number').textContent = `${index + 1}`;
     const sheet = card.querySelector('.page-sheet');
     jobs.push(renderThumbnail(entry, card.querySelector('canvas'), sheet).catch(error => console.error(error)));
@@ -134,6 +150,74 @@ async function renderPages() {
   elements.pageGrid.append(fragment);
   updateControls();
   await Promise.all(jobs);
+}
+
+async function renderViewerPage() {
+  const entry = state.pages[state.viewerIndex];
+  if (!entry) return;
+  const renderToken = ++state.viewerRenderToken;
+  const source = state.sources.get(entry.sourceId);
+  const page = await source.preview.getPage(entry.sourcePageIndex + 1);
+  const zoomScale = 1.35 * state.viewerZoom / 100;
+  const viewport = page.getViewport({ scale: zoomScale, rotation: page.rotate + entry.rotation });
+  const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+  const canvas = elements.viewerCanvas;
+  canvas.width = Math.floor(viewport.width * pixelRatio);
+  canvas.height = Math.floor(viewport.height * pixelRatio);
+  canvas.style.width = `${Math.floor(viewport.width)}px`;
+  canvas.style.height = `${Math.floor(viewport.height)}px`;
+  if (state.viewerRenderTask) state.viewerRenderTask.cancel();
+  const context = canvas.getContext('2d');
+  context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+  state.viewerRenderTask = page.render({ canvasContext: context, viewport });
+  try {
+    await state.viewerRenderTask.promise;
+  } catch (error) {
+    if (error?.name !== 'RenderingCancelledException') throw error;
+    return;
+  } finally {
+    if (renderToken === state.viewerRenderToken) state.viewerRenderTask = null;
+  }
+  if (renderToken !== state.viewerRenderToken) return;
+  elements.viewerTitle.textContent = `페이지 ${state.viewerIndex + 1}`;
+  elements.viewerPageStatus.textContent = `${state.viewerIndex + 1} / ${state.pages.length}`;
+  elements.viewerSource.textContent = source.name;
+  elements.viewerZoomLabel.textContent = `${state.viewerZoom}%`;
+  elements.viewerPrev.disabled = state.viewerIndex === 0;
+  elements.viewerNext.disabled = state.viewerIndex === state.pages.length - 1;
+}
+
+async function openViewer(index) {
+  state.viewerIndex = index;
+  state.viewerZoom = 100;
+  elements.pageViewer.hidden = false;
+  document.body.classList.add('viewer-open');
+  elements.viewerClose.focus();
+  await renderViewerPage();
+}
+
+function closeViewer() {
+  state.viewerRenderToken++;
+  if (state.viewerRenderTask) state.viewerRenderTask.cancel();
+  state.viewerRenderTask = null;
+  state.viewerIndex = -1;
+  elements.pageViewer.hidden = true;
+  document.body.classList.remove('viewer-open');
+}
+
+async function changeViewerPage(amount) {
+  const nextIndex = Math.max(0, Math.min(state.pages.length - 1, state.viewerIndex + amount));
+  if (nextIndex === state.viewerIndex) return;
+  state.viewerIndex = nextIndex;
+  elements.viewerStage.scrollTo(0, 0);
+  await renderViewerPage();
+}
+
+async function changeViewerZoom(amount) {
+  const nextZoom = Math.max(50, Math.min(200, state.viewerZoom + amount));
+  if (nextZoom === state.viewerZoom) return;
+  state.viewerZoom = nextZoom;
+  await renderViewerPage();
 }
 
 function refreshSelection() {
@@ -233,7 +317,16 @@ document.addEventListener('drop', event => {
 
 elements.pageGrid.addEventListener('click', event => {
   const card = event.target.closest('.page-card');
-  if (card) selectPage(Number(card.dataset.id), event);
+  if (!card) return;
+  if (event.target.closest('.preview-page')) {
+    openViewer([...elements.pageGrid.children].indexOf(card));
+    return;
+  }
+  selectPage(Number(card.dataset.id), event);
+});
+elements.pageGrid.addEventListener('dblclick', event => {
+  const card = event.target.closest('.page-card');
+  if (card) openViewer([...elements.pageGrid.children].indexOf(card));
 });
 elements.pageGrid.addEventListener('dragstart', event => {
   const card = event.target.closest('.page-card');
@@ -283,7 +376,23 @@ elements.selectAll.addEventListener('click', () => {
 });
 elements.zoom.addEventListener('input', event => elements.pageGrid.style.setProperty('--thumb-width', `${event.target.value}px`));
 elements.saveButton.addEventListener('click', savePdf);
+elements.viewerClose.addEventListener('click', closeViewer);
+elements.viewerPrev.addEventListener('click', () => changeViewerPage(-1));
+elements.viewerNext.addEventListener('click', () => changeViewerPage(1));
+elements.viewerZoomOut.addEventListener('click', () => changeViewerZoom(-25));
+elements.viewerZoomIn.addEventListener('click', () => changeViewerZoom(25));
+elements.pageViewer.addEventListener('click', event => {
+  if (event.target === elements.pageViewer) closeViewer();
+});
 document.addEventListener('keydown', event => {
+  if (!elements.pageViewer.hidden) {
+    if (event.key === 'Escape') closeViewer();
+    if (event.key === 'ArrowLeft') changeViewerPage(-1);
+    if (event.key === 'ArrowRight') changeViewerPage(1);
+    if (event.key === '+' || event.key === '=') changeViewerZoom(25);
+    if (event.key === '-') changeViewerZoom(-25);
+    return;
+  }
   const modifier = event.ctrlKey || event.metaKey;
   if (modifier && event.key.toLowerCase() === 'a' && !elements.workspace.hidden) {
     event.preventDefault();

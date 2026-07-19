@@ -56,6 +56,18 @@ try {
   await assert.doesNotReject(() => page.locator('.page-card').nth(2).waitFor());
   assert.equal(await page.locator('.page-card').count(), 3, '두 PDF의 페이지가 모두 표시되어야 합니다.');
 
+  await page.locator('.page-card').first().locator('.preview-page').click();
+  await page.locator('#page-viewer').waitFor({ state: 'visible' });
+  assert.equal(await page.locator('#viewer-page-status').textContent(), '1 / 3', '상세 보기의 현재 페이지가 표시되어야 합니다.');
+  const initialCanvasWidth = await page.locator('#viewer-canvas').evaluate(canvas => canvas.width);
+  await page.locator('#viewer-next').click();
+  await page.locator('#viewer-zoom-in').click();
+  await page.waitForFunction(width => document.querySelector('#viewer-canvas').width > width, initialCanvasWidth);
+  assert.equal(await page.locator('#viewer-page-status').textContent(), '2 / 3', '다음 페이지로 이동할 수 있어야 합니다.');
+  assert.equal(await page.locator('#viewer-zoom-label').textContent(), '125%', '확대 비율이 표시되어야 합니다.');
+  await page.keyboard.press('Escape');
+  await page.locator('#page-viewer').waitFor({ state: 'hidden' });
+
   await page.locator('.page-card').first().click();
   await page.locator('#rotate-right').click();
   await page.locator('.page-card').first().click();
