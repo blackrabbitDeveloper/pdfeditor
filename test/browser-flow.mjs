@@ -112,6 +112,11 @@ try {
   await page.locator('#transform-rotation').press('Enter');
   assert.equal(await page.locator('#transform-size').inputValue(), '24', '서명·도장 크기를 값으로 조절할 수 있어야 합니다.');
   assert.equal(await page.locator('#transform-rotation').inputValue(), '12', '서명·도장 회전을 값으로 조절할 수 있어야 합니다.');
+  await page.locator('#transform-unit').selectOption('mm');
+  await page.locator('#transform-size').fill('35');
+  await page.locator('#transform-size').blur();
+  await page.waitForFunction(() => Math.abs(Number(document.querySelector('#transform-size').value) - 35) < .1);
+  assert.equal(await page.locator('#transform-unit').inputValue(), 'mm', '크기를 mm 단위로 조절할 수 있어야 합니다.');
   const hitbox = await overlay.evaluate(canvas => JSON.parse(canvas.dataset.hitboxes).at(-1));
   const startX = overlayBox.x + (hitbox.x + hitbox.width / 2) / await overlay.evaluate(canvas => canvas.width) * overlayBox.width;
   const startY = overlayBox.y + (hitbox.y + hitbox.height / 2) / await overlay.evaluate(canvas => canvas.height) * overlayBox.height;

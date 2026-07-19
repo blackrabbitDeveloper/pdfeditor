@@ -49,6 +49,7 @@ const elements = {
   viewerTransform: document.getElementById('viewer-transform'),
   transformX: document.getElementById('transform-x'), transformY: document.getElementById('transform-y'),
   transformSize: document.getElementById('transform-size'), transformRotation: document.getElementById('transform-rotation'),
+  transformUnit: document.getElementById('transform-unit'),
   transformDelete: document.getElementById('transform-delete')
 };
 
@@ -72,7 +73,9 @@ const state = {
   overlayHitboxes: [],
   selectedAnnotationId: null,
   draggingAnnotationId: null,
-  pendingPlacement: null
+  pendingPlacement: null,
+  transformUnit: 'percent',
+  viewerPageWidthMm: 0
 };
 
 let toastTimer;
@@ -290,6 +293,8 @@ async function renderViewerPage() {
   const source = state.sources.get(entry.sourceId);
   const page = await source.preview.getPage(entry.sourcePageIndex + 1);
   const zoomScale = 1.35 * state.viewerZoom / 100;
+  const physicalViewport = page.getViewport({ scale: 1, rotation: page.rotate + entry.rotation });
+  state.viewerPageWidthMm = physicalViewport.width * 25.4 / 72;
   const viewport = page.getViewport({ scale: zoomScale, rotation: page.rotate + entry.rotation });
   const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
   const canvas = elements.viewerCanvas;
@@ -387,7 +392,13 @@ function syncTransformControls() {
   if (!annotation) return;
   elements.transformX.value = Math.round(annotation.x * 100);
   elements.transformY.value = Math.round(annotation.y * 100);
-  elements.transformSize.value = Math.round(annotation.width * 100);
+  elements.transformSize.value = state.transformUnit === 'mm'
+    ? (annotation.width * state.viewerPageWidthMm).toFixed(1)
+    : Math.round(annotation.width * 100);
+  elements.transformSize.min = state.transformUnit === 'mm' ? '5' : '5';
+  elements.transformSize.max = state.transformUnit === 'mm' ? Math.floor(state.viewerPageWidthMm * .9) : '90';
+  elements.transformSize.step = state.transformUnit === 'mm' ? '.5' : '1';
+  elements.transformUnit.value = state.transformUnit;
   elements.transformRotation.value = annotation.rotation || 0;
 }
 
@@ -690,7 +701,7 @@ function clampImageAnnotation(annotation) {
 
 for (const [input, property, divisor] of [
   [elements.transformX, 'x', 100], [elements.transformY, 'y', 100],
-  [elements.transformSize, 'width', 100], [elements.transformRotation, 'rotation', 1]
+  [elements.transformRotation, 'rotation', 1]
 ]) {
   input.addEventListener('change', () => {
     const annotation = selectedAnnotation();
@@ -702,6 +713,22 @@ for (const [input, property, divisor] of [
     showToast('Transform 값을 변경했습니다.');
   });
 }
+elements.transformSize.addEventListener('change', () => {
+  const annotation = selectedAnnotation();
+  if (!annotation) return;
+  pushHistory();
+  annotation.width = state.transformUnit === 'mm'
+    ? Number(elements.transformSize.value) / state.viewerPageWidthMm
+    : Number(elements.transformSize.value) / 100;
+  annotation.width = Math.max(.05, Math.min(.9, annotation.width));
+  clampImageAnnotation(annotation);
+  redrawViewerOverlay();
+  showToast(`크기를 ${elements.transformSize.value}${state.transformUnit === 'mm' ? 'mm' : '%'}로 변경했습니다.`);
+});
+elements.transformUnit.addEventListener('change', () => {
+  state.transformUnit = elements.transformUnit.value;
+  syncTransformControls();
+});
 elements.transformDelete.addEventListener('click', () => {
   if (!selectedAnnotation()) return;
   pushHistory();

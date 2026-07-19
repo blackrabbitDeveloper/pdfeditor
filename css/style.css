@@ -131,6 +131,7 @@ button:focus-visible, [tabindex]:focus-visible { outline: 3px solid rgba(255, 91
 .viewer-transform strong { margin-right: 4px; color: var(--accent); font-size: 9px; letter-spacing: .13em; }
 .viewer-transform label { display: flex; align-items: center; gap: 4px; color: #aaa59c; font-size: 9px; }
 .viewer-transform input { width: 52px; padding: 5px 4px; color: white; border: 1px solid rgba(255,255,255,.16); border-radius: 5px; background: #3b3934; font-size: 11px; text-align: right; }
+.viewer-transform select { height: 27px; padding: 0 4px; color: white; border: 1px solid rgba(255,255,255,.16); border-radius: 5px; background: #3b3934; font-size: 10px; }
 .viewer-transform button { padding: 6px 9px; color: #ff8069; border: 1px solid rgba(255,91,61,.28); border-radius: 5px; background: transparent; font-size: 10px; cursor: pointer; }
 body.viewer-open { overflow: hidden; }
 .edit-dialog { width: min(460px, calc(100% - 28px)); padding: 0; color: var(--ink); border: 0; border-radius: 14px; background: var(--white); box-shadow: 0 28px 80px rgba(0,0,0,.3); }
